@@ -1,6 +1,5 @@
 'use client'
 import React, { useState, useRef, useEffect } from 'react';
-import { Dialog, Transition, TransitionChild } from '@headlessui/react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -10,7 +9,6 @@ interface Message {
 interface SentimentResult {
   positive: number;
   negative: number;
-  neutral: number;
   overall: string;
 }
 
@@ -18,12 +16,10 @@ const InterviewFeedbackAnalyzer: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [sentiment, setSentiment] = useState<SentimentResult | null>(null);
   const endOfMessagesRef = useRef<null | HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
+    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(scrollToBottom, [messages]);
@@ -33,7 +29,7 @@ const InterviewFeedbackAnalyzer: React.FC = () => {
     if (!input.trim()) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsAnalyzing(true);
 
@@ -43,21 +39,21 @@ const InterviewFeedbackAnalyzer: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: input }),
       });
-      const data: SentimentResult = await response.json();
-      setSentiment(data);
-      
-      const assistantMessage: Message = {
+      const data = await response.json();
+
+      const sentimentMessage: Message = {
         role: 'assistant',
-        content: `I've analyzed the sentiment of your feedback. Would you like to see the results?`
+        content: `Here is your analysis from the feedback:\nPositive: ${data.positive.toFixed(2)}%\nNegative: ${data.negative.toFixed(2)}%\nOverall: ${data.overall}`,
       };
-      setMessages(prev => [...prev, assistantMessage]);
+
+      setMessages((prev) => [...prev, sentimentMessage]);
     } catch (error) {
       console.error('Error analyzing sentiment:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: 'I apologize, but I encountered an error while analyzing the sentiment. Could you please try again?'
+        content: 'I encountered an error while analyzing the sentiment. Could you please try again?',
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsAnalyzing(false);
     }
@@ -76,7 +72,11 @@ const InterviewFeedbackAnalyzer: React.FC = () => {
             <div className="flex-grow overflow-y-auto px-4 pt-5 pb-4 sm:p-6">
               {messages.map((message, index) => (
                 <div key={index} className={`mb-4 ${message.role === 'assistant' ? 'text-left' : 'text-right'}`}>
-                  <div className={`inline-block p-2 rounded-lg ${message.role === 'assistant' ? 'bg-gray-200 text-gray-800' : 'bg-blue-500 text-white'}`}>
+                  <div
+                    className={`inline-block p-2 rounded-lg ${
+                      message.role === 'assistant' ? 'bg-gray-200 text-gray-800' : 'bg-blue-500 text-white'
+                    }`}
+                  >
                     {message.content}
                   </div>
                 </div>
@@ -105,75 +105,6 @@ const InterviewFeedbackAnalyzer: React.FC = () => {
           </div>
         </div>
       </main>
-
-      <Transition show={showResults} as={React.Fragment}>
-        <Dialog
-          as="div"
-          className="fixed inset-0 z-10 overflow-y-auto"
-          onClose={() => setShowResults(false)}
-        >
-          <div className="min-h-screen px-4 text-center">
-            <TransitionChild
-              as={React.Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-            >
-              {/* <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" /> */}
-            </TransitionChild>
-
-            <span
-              className="inline-block h-screen align-middle"
-              aria-hidden="true"
-            >
-              &#8203;
-            </span>
-
-            <TransitionChild
-              as={React.Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
-                <Dialog.Title
-                  as="h3"
-                  className="text-lg font-medium leading-6 text-gray-900"
-                >
-                  Sentiment Analysis Results
-                </Dialog.Title>
-                <div className="mt-2">
-                  {sentiment && (
-                    <>
-                      <p className="text-sm text-gray-500">Positive: {sentiment.positive.toFixed(2)}%</p>
-                      <p className="text-sm text-gray-500">Negative: {sentiment.negative.toFixed(2)}%</p>
-                      <p className="text-sm text-gray-500">Neutral: {sentiment.neutral.toFixed(2)}%</p>
-                      <p className="mt-2 text-sm text-gray-500">
-                        Overall sentiment: <strong>{sentiment.overall}</strong>
-                      </p>
-                    </>
-                  )}
-                </div>
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-blue-900 bg-blue-100 border border-transparent rounded-md hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
-                    onClick={() => setShowResults(false)}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </TransitionChild>
-          </div>
-        </Dialog>
-      </Transition>
     </div>
   );
 };

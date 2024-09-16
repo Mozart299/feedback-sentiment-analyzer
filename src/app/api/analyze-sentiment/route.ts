@@ -1,47 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
-import natural from 'natural';
-
-const analyzer = new natural.SentimentAnalyzer("English", natural.PorterStemmer, "afinn");
+import axios from 'axios';
 
 interface RequestBody {
   text: string;
 }
 
+
 interface SentimentResponse {
   positive: number;
   negative: number;
-  neutral: number;
   overall: string;
 }
 
+const HUGGING_FACE_API_URL = 'https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english';
+const HUGGING_FACE_API_KEY = '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'; // Add this to your environment variables
+
 export async function POST(req: NextRequest): Promise<NextResponse<SentimentResponse>> {
   const { text }: RequestBody = await req.json();
-  
-  const tokenizer = new natural.WordTokenizer();
-  const stemmer = natural.PorterStemmer;
-  const tokens = tokenizer.tokenize(text);
-  const stemmedTokens = tokens.map(token => stemmer.stem(token));
-  
-  const sentiment = analyzer.getSentiment(stemmedTokens);
-  
-  const total = Math.abs(sentiment);
-  const positive = Math.max(0, sentiment) / total * 100;
-  const negative = Math.max(0, -sentiment) / total * 100;
-  const neutral = 100 - positive - negative;
-  
-  let overall: string;
-  if (sentiment > 0.05) {
-    overall = "Positive";
-  } else if (sentiment < -0.05) {
-    overall = "Negative";
-  } else {
-    overall = "Neutral";
+
+  try {
+    const response = await axios.post(
+      HUGGING_FACE_API_URL,
+      { inputs: text },
+      {
+        headers: {
+          Authorization: `Bearer ${HUGGING_FACE_API_KEY}`,
+        },
+      }
+    );
+
+    // Log the raw response from the model
+    console.log('Raw response from Hugging Face API:', response.data);
+
+    const result = response.data[0];
+
+    // Extract scores directly from the result
+    const positiveScore = result.find((item: { label: string; score: number }) => item.label === 'POSITIVE')?.score || 0;
+    const negativeScore = result.find((item: { label: string; score: number }) => item.label === 'NEGATIVE')?.score || 0;
+
+    // Calculate percentages
+    const positive = positiveScore * 100; // Convert to percentage
+    const negative = negativeScore * 100; // Convert to percentage
+
+    // Determine overall sentiment based on scores
+    const overall = positive > negative ? 'Positive' : 'Negative';
+
+    return NextResponse.json({
+      positive,
+      negative,
+      overall,
+    });
+  } catch (error) {
+    console.error('Error calling Hugging Face API:', error);
+
+    // Return a default sentiment response in case of error
+    return NextResponse.json({
+      positive: 0,
+      negative: 0,
+      overall: 'Negative' // Defaulting to Negative in case of error for better clarity
+    });
   }
-  
-  return NextResponse.json({
-    positive,
-    negative,
-    neutral,
-    overall
-  });
 }
